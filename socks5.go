@@ -124,7 +124,7 @@ func (s *Server) ServeConn(conn net.Conn) error {
 	// Read the version byte
 	version := []byte{0}
 	if _, err := bufConn.Read(version); err != nil {
-		s.config.Logger.Printf("[ERR] socks: Failed to get version byte: %v", err)
+		s.config.Logger.Printf("[ERR] socks: failed to get version byte: %v", err)
 		return err
 	}
 
