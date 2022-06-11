@@ -12,11 +12,16 @@ import (
 )
 
 type MockConn struct {
-	buf bytes.Buffer
+	buf       bytes.Buffer
+	localAddr net.Addr
 }
 
 func (m *MockConn) Write(b []byte) (int, error) {
 	return m.buf.Write(b)
+}
+
+func (m *MockConn) LocalAddr() net.Addr {
+	return m.localAddr
 }
 
 func (m *MockConn) RemoteAddr() net.Addr {
@@ -67,7 +72,7 @@ func TestRequest_Connect(t *testing.T) {
 	buf.Write([]byte("ping"))
 
 	// Handle the request
-	resp := &MockConn{}
+	resp := &MockConn{localAddr: lAddr}
 	req, err := NewRequest(buf)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -142,7 +147,7 @@ func TestRequest_Connect_RuleFail(t *testing.T) {
 	buf.Write([]byte("ping"))
 
 	// Handle the request
-	resp := &MockConn{}
+	resp := &MockConn{localAddr: lAddr}
 	req, err := NewRequest(buf)
 	if err != nil {
 		t.Fatalf("err: %v", err)
