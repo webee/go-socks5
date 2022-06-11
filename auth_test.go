@@ -2,6 +2,7 @@ package socks5
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -77,7 +78,7 @@ func TestPasswordAuth_Invalid(t *testing.T) {
 	s, _ := New(&Config{AuthMethods: []Authenticator{cator}})
 
 	ctx, err := s.authenticate(&resp, req)
-	if err != errUserAuthFailed {
+	if !strings.HasPrefix(err.Error(), errUserAuthFailed.Error()) {
 		t.Fatalf("err: %v", err)
 	}
 
