@@ -1,6 +1,7 @@
 package socks5
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -324,7 +325,7 @@ func readAddrSpec(r io.Reader) (*AddrSpec, error) {
 	if _, err := io.ReadAtLeast(r, port, 2); err != nil {
 		return nil, err
 	}
-	d.Port = (int(port[0]) << 8) | int(port[1])
+	d.Port = int(binary.BigEndian.Uint16(port))
 
 	return d, nil
 }
