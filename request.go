@@ -6,8 +6,11 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"context"
+
+	"golang.org/x/net/proxy"
 )
 
 const (
@@ -172,13 +175,29 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 	dial := s.config.Dial
 	if dial == nil {
 		dial = func(ctx context.Context, net_, addr string, localAddr net.Addr) (net.Conn, error) {
+			var dialer proxy.Dialer = &net.Dialer{Timeout: 15 * time.Second}
 			laddr := localAddr.(*net.TCPAddr)
-			if laddr.IP.IsLoopback() {
-				return net.Dial(net_, addr)
+			if !laddr.IP.IsLoopback() {
+				dialer = &net.Dialer{Timeout: 15 * time.Second, LocalAddr: &net.TCPAddr{IP: laddr.IP, Zone: laddr.Zone}}
 			}
 
-			dialer := net.Dialer{LocalAddr: &net.TCPAddr{IP: laddr.IP, Zone: laddr.Zone}}
-			return dialer.Dial(net_, addr)
+			relay_host := req.AuthContext.Payload[RELAY_HOST]
+			if relay_host == "" {
+				return dialer.Dial(net_, addr)
+			}
+
+			// relay
+			relay_username := req.AuthContext.Payload[RELAY_USERNAME]
+			relay_password := req.AuthContext.Payload[RELAY_PASSWORD]
+
+			relay_port := req.AuthContext.Payload[RELAY_PORT]
+			relay_addr := relay_host + ":" + relay_port
+			socks5_dialer, err := proxy.SOCKS5(net_, relay_addr, &proxy.Auth{User: relay_username, Password: relay_password}, dialer)
+			if err != nil {
+				return nil, err
+			}
+
+			return socks5_dialer.Dial(net_, addr)
 		}
 	}
 	target, err := dial(ctx, "tcp", req.realDestAddr.Address(), conn.LocalAddr())
@@ -206,8 +225,8 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 
 	// Start proxying
 	errCh := make(chan error, 2)
-	go proxy(target, req.bufConn, errCh)
-	go proxy(conn, target, errCh)
+	go _proxy(target, req.bufConn, errCh)
+	go _proxy(conn, target, errCh)
 
 	// Wait
 	for i := 0; i < 2; i++ {
@@ -220,7 +239,7 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 	return nil
 }
 
-// handleBind is used to handle a connect command
+// handleBind is used to handle a bind command
 func (s *Server) handleBind(ctx context.Context, conn conn, req *Request) error {
 	// Check if this is allowed
 	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
@@ -239,7 +258,7 @@ func (s *Server) handleBind(ctx context.Context, conn conn, req *Request) error 
 	return nil
 }
 
-// handleAssociate is used to handle a connect command
+// handleAssociate is used to handle a associate command
 func (s *Server) handleAssociate(ctx context.Context, conn conn, req *Request) error {
 	// Check if this is allowed
 	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
@@ -360,9 +379,9 @@ type closeWriter interface {
 	CloseWrite() error
 }
 
-// proxy is used to suffle data from src to destination, and sends errors
+// _proxy is used to suffle data from src to destination, and sends errors
 // down a dedicated channel
-func proxy(dst io.Writer, src io.Reader, errCh chan error) {
+func _proxy(dst io.Writer, src io.Reader, errCh chan error) {
 	_, err := io.Copy(dst, src)
 	if tcpConn, ok := dst.(closeWriter); ok {
 		tcpConn.CloseWrite()

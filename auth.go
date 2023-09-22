@@ -3,6 +3,7 @@ package socks5
 import (
 	"fmt"
 	"io"
+	"strings"
 )
 
 const (
@@ -12,6 +13,13 @@ const (
 	userAuthVersion = uint8(1)
 	authSuccess     = uint8(0)
 	authFailure     = uint8(1)
+)
+
+const (
+	RELAY_USERNAME = "RELAY_USERNAME"
+	RELAY_PASSWORD = "RELAY_PASSWORD"
+	RELAY_HOST     = "RELAY_HOST"
+	RELAY_PORT     = "RELAY_PORT"
 )
 
 var (
@@ -51,6 +59,7 @@ func (a NoAuthAuthenticator) Authenticate(reader io.Reader, writer io.Writer) (*
 // authentication
 type UserPassAuthenticator struct {
 	Credentials CredentialStore
+	Separator   string
 }
 
 func (a UserPassAuthenticator) GetCode() uint8 {
@@ -93,8 +102,27 @@ func (a UserPassAuthenticator) Authenticate(reader io.Reader, writer io.Writer) 
 		return nil, err
 	}
 
+	username := string(user)
+	password := string(pass)
+	// split user/pass from relay user/pass
+	relay_username := ""
+	relay_password := ""
+	relay_host := ""
+	relay_port := ""
+	if a.Separator != "" {
+		// all in username
+		username_parts := strings.Split(username, a.Separator)
+		username = username_parts[0]
+		if len(username_parts) >= 5 {
+			relay_username = username_parts[1]
+			relay_password = username_parts[2]
+			relay_host = username_parts[3]
+			relay_port = username_parts[4]
+		}
+	}
+
 	// Verify the password
-	if a.Credentials.Valid(string(user), string(pass)) {
+	if a.Credentials.Valid(username, password) {
 		if _, err := writer.Write([]byte{userAuthVersion, authSuccess}); err != nil {
 			return nil, err
 		}
@@ -102,11 +130,17 @@ func (a UserPassAuthenticator) Authenticate(reader io.Reader, writer io.Writer) 
 		if _, err := writer.Write([]byte{userAuthVersion, authFailure}); err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("%s: [%s:%s]", errUserAuthFailed, string(user), string(pass))
+		return nil, fmt.Errorf("%s: [%s:%s]", errUserAuthFailed, username, password)
 	}
 
 	// Done
-	return &AuthContext{UserPassAuth, map[string]string{"Username": string(user)}}, nil
+	return &AuthContext{UserPassAuth, map[string]string{
+		"Username":     username,
+		RELAY_USERNAME: relay_username,
+		RELAY_PASSWORD: relay_password,
+		RELAY_HOST:     relay_host,
+		RELAY_PORT:     relay_port,
+	}}, nil
 }
 
 // authenticate is used to handle connection authentication

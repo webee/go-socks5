@@ -10,7 +10,14 @@ usage:
 
 ```
 // listen on 1080 for all interfaces
-# socks5-proxy --addr=:1080 --user=user --pass=pass
+# socks5-proxy --addr=:1080 --user=user --pass=pass [--relay-sep='__r_']
+```
+
+```
+// test use proxy
+# curl -x 'socks5://user:pass@<ip>:<port>' httpbin.org/ip
+// test use proxy with relay
+# curl -x 'socks5://user__r_<ru>__r_<rp>__r_<rh>__r_<rp>:pass@<ip>:<port>' httpbin.org/ip
 ```
 
 # Feature

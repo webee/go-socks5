@@ -24,7 +24,8 @@ type Config struct {
 	// If provided, username/password authentication is enabled,
 	// by appending a UserPassAuthenticator to AuthMethods. If not provided,
 	// and AUthMethods is nil, then "auth-less" mode is enabled.
-	Credentials CredentialStore
+	Credentials   CredentialStore
+	CredentialSep string
 
 	// Resolver can be provided to do custom name resolution.
 	// Defaults to DNSResolver if not provided.
@@ -62,7 +63,7 @@ func New(conf *Config) (*Server, error) {
 	// Ensure we have at least one authentication method enabled
 	if len(conf.AuthMethods) == 0 {
 		if conf.Credentials != nil {
-			conf.AuthMethods = []Authenticator{&UserPassAuthenticator{conf.Credentials}}
+			conf.AuthMethods = []Authenticator{&UserPassAuthenticator{conf.Credentials, conf.CredentialSep}}
 		} else {
 			conf.AuthMethods = []Authenticator{&NoAuthAuthenticator{}}
 		}

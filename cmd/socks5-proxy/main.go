@@ -11,9 +11,10 @@ import (
 var (
 	logger *log.Logger
 	// arguments
-	addr string
-	user string
-	pass string
+	addr      string
+	user      string
+	pass      string
+	relay_sep string
 )
 
 func init() {
@@ -21,17 +22,16 @@ func init() {
 	flag.StringVar(&addr, "addr", ":1080", "address to listen")
 	flag.StringVar(&user, "user", "", "username")
 	flag.StringVar(&pass, "pass", "", "password")
+	flag.StringVar(&relay_sep, "relay-sep", "__r_", "relay info separator")
 }
 
 func main() {
 	flag.Parse()
 
 	conf := &socks5.Config{Logger: logger}
-	if user != "" {
-		cred := socks5.StaticCredentials{user: pass}
-		authenticator := socks5.UserPassAuthenticator{Credentials: cred}
-
-		conf.AuthMethods = append(conf.AuthMethods, authenticator)
+	if user != "" || relay_sep != "" {
+		conf.Credentials = socks5.StaticCredentials{user: pass}
+		conf.CredentialSep = relay_sep
 	}
 
 	server, err := socks5.New(conf)
